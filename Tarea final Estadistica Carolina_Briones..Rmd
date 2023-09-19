@@ -1,0 +1,251 @@
+---
+title: "Clasificación de clientes de banca usando regresión logística"
+author: "Carolina Briones Meza"
+date: "2023-09-17"
+output: html_document
+---
+
+### Introducción
+
+
+En este proyecto, analizaremos los datos del conjunto de datos real de marketing bancario de la [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/222/bank+marketing). El conjunto de datos contiene información sobre clientes de un banco que fueron contactados por un agente de ventas para ofrecer un nuevo producto bancario. La variable objetivo es "y", que indica si el cliente aceptó o no el nuevo producto.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(rlang)
+library(DT)
+library(remotes)
+library(caret)
+```
+
+# Carga de Datos
+
+Cargamos el conjunto de datos del banco portugués.
+
+```{r data load, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+bank_full <- read_excel("C:/Users/IMPORTSOLUTION/Desktop/Datasets/bank-full.xls")
+
+
+bank_full <- bank_full %>%
+  mutate(across(where(is.character), as.factor))
+```
+
+
+Los datos luces de la siguiente forma:
+
+```{r}
+datatable(bank_full%>% head(100))
+
+```
+
+Como podemos ver en el histograma siguiente, la clase "no" tiene muchas más observaciones que la clase "sí". Esto significa que el conjunto de datos está *desbalanceado*.
+
+```{r warning=FALSE}
+ggplot(bank_full, aes(x = y)) +
+  geom_bar(aes(y = ..count../sum(..count..), fill = y), width = 0.7) +
+  labs(x = "Aceptación del producto", y = "Frecuencia Relativa") +
+  scale_y_continuous(labels = scales::percent)
+```
+
+### Balanceo de datos
+
+Para balancear el conjunto de datos, podemos utilizar un método de resampling (remuestreo). Un método de resampling es un método que crea nuevas observaciones para la clase minoritaria. Esto ayuda a garantizar que ambas clases estén representadas de manera uniforme en el conjunto de datos balanceado.
+
+*El uso de datos desbalanceados en clasificación puede generar modelos sesgados, con alta capacidad para identificar la clase mayoritaria pero pobre rendimiento en detectar la clase minoritaria. Esto puede resultar en análisis engañosos y decisiones subóptimas, siendo crucial aplicar técnicas de balanceo para construir un modelo más preciso y justo.*
+
+En esta tarea vamos a utilizar el método SMOTE para balancear el conjunto de datos. SMOTE crea nuevas observaciones para la clase minoritaria emparejando observaciones de la clase minoritaria con observaciones de la clase mayoritaria.
+
+```{r include=FALSE}
+#remotes::install_github("cran/DMwR")
+```
+
+```{r message=FALSE, warning=FALSE}
+#library(DMwR)
+smote_dataset <- as.data.frame(bank_full) # dataset para aplicar smote
+smote_dataset$y <- as.factor(smote_dataset$y) # Aseguramos que y sea un factor
+bank_full_balanced <- lm(y ~ ., data = smote_dataset, perc.over = 100, k = 5)
+```
+
+Y ahora verificamos que la data se encuentra balanceada y lista para ser trabajada.
+
+```{r}
+# Verificamos el balanceo de datos creando un nuevo diagrama de barras
+ggplot(bank_full, aes(x = y)) +
+  geom_bar(aes(y = ..count../sum(..count..), fill = y), width = 0.7) +
+  labs(x = "Aceptación del producto", y = "Frecuencia Relativa") +
+  scale_y_continuous(labels = scales::percent)
+```
+
+## Desarrollo
+
+Ahora sí, con la data balanceada podemos trabajar:
+
+- Implemente un modelo de regresión logística para explorar la relación entre las variables disponibles y la respuesta del cliente (aceptar o no el nuevo producto).
+
+```{r}
+smote_dataset %>% colnames()
+```
+
+
+```{r}
+modelo_logistico <- glm(y ~ age + job + marital + education + default + balance + housing + loan + previous + poutcome, data = smote_dataset, family = binomial)
+summary(modelo_logistico)
+```
+
+-**El modelo de regresion logistica nos muestra la relación entre varias variables cuyos valores varian, las variable se puede definir como la probabilidad de si acepten o no el producto bancario,analizar los resultados dando nuestro criterio**.
+
+
+- Realice un análisis similar al llevado a cabo durante la práctica en clase, con el objetivo de identificar los factores que influyen en la decisión del cliente de aceptar o no el nuevo producto. Indentifique, cuantifique, concluya.
+
+```{r}
+modelo_logistico <- glm(y ~ age + job + education + housing + loan + contact + day + poutcome, data = smote_dataset, family = binomial)
+summary(modelo_logistico)
+```
+-**Para interpretar las variables que influyen en la decisión del cliente son las sgts**  
+
+-**Emprendedores (jobentrepreneur)** Las personas emprendedores tiene un coeficiente negativo -0.365159 con un exponencial del 69% no tiene los recursos para aceptar el producto bancario.  
+
+-**Empleadas Domesticas (jobhousemaid)** Las empleadas domesticas con un coeficiente negativo -0.389602 con un exponencial del 67% no aceptan el producto.  
+
+-**Jubilados (jobretired)** Las personas jubilidas tienen un coeficiente positivo 0.536298 si tiene la aceptacion a recibir un producto bancario que ofrece el agente de ventas.  
+
+-**Estudiantes trabajan (jobstudent)** Los Estudiantes que trabajan con coeficiente positivo 0.536481 si aceptan el nuevo producto bancario.  
+
+-**Tecnicos trabajan (jobtechnician)** El personal que trabaja como tecnico con un coeficiente negativo -0.204258 no tiene aceptacion al producto con un porcentaje del 81% no tiene los recursos para poder pagar al banco.  
+
+-**Estudiantes educacion terciaria (educationtertiary)** Los estudiantes de educacion terciarias con coeficiente positivo 0.373280 si aceptan el producto que indica el asesor de ventas.  
+
+-**Personas en Viviendas (housingyes)** Las personas que estan en casa y no tienen un empleo o un ingreso fijo,tienen un coeficiente negativo -0.582589 con un exponencial del 56% no estan en condiciones de recibir ni pagar el producto que ofrece el banco.  
+
+-**Personas con Prestamos (loanye)** Las personas que tienen un prestamo presentan un coeficiente negativo -0.518494 con un porcentaje del 59% no aceptada el producto porque cuenta con un prestamo que debe pagar al banco primero salir de las deudas.  
+
+-**contactunknown** Por contactos desconocidos tienen un coeficiente negativo -0.982322 las personas que desconocen o desconfian con un porcentaje del 37% no aceptan los productos que ofrece el asesor de la agencia bancaria.  
+
+-**day** Con un coeficiente negativo -0.009771 es significativo con un 99% se rechaza en dias los clientes al nuevo producto bancario, la respuesta gran parte de clientes es NO aceptan el producto.  
+
+-**poutcomeother** El coeficiente es positivo 0.291690 si aceptan los productos que ofrecen los agentes de ventas.  
+
+-**poutcomesuccess** Los pucheros exitosos con un coeficiente positivo alto 2.259223 si aceptan el producto bancario, es de su interes aceptar el nuevo producto para poder invertir en sus negocios o empresas.  
+
+-**poutcomeunknown** Los pucheros desconocidos -0.193945 no aceptan el producto bancario con un porcentaje del 82%.
+
+-En difinitiva el producto nuevo bancario no tiene una aceptacion tan relevante para los clientes,
+las personas que aceptan el nuevo producto bancario son las que perciben que les brindará beneficios financieros como tasas de interés favorables, bonificaciones,tiene una buena recomendacion de un agente de ventas de confianza o una buena reputación del banco puede influir en la decisión.
+
+-**Los clientes que NO aceptaron el producto es por tarifas adiconales,por la falta de confianza en el agente de ventas,producto bancario no se adapta a las necesidades o metas financieras del cliente,experiencias negativas de los bancos,preferencias personales.**
+
+***La decisión de aceptar o rechazar un producto bancario depende de la situación financiera individual, las necesidades, las percepciones y las circunstancias personales de cada cliente. Los agentes de ventas bancarias suelen trabajar para presentar el producto de manera atractiva, abordar las preocupaciones del cliente y proporcionar información transparente para ayudar a los clientes a tomar una decisión informada.***
+
+- Evalúe la capacidad predictiva del modelo desarrollado utilizando una matriz de confusión. Para ello, divida los datos en un conjunto de entrenamiento (80%) y un conjunto de prueba (20%), seleccionados de manera completamente aleatoria. Para esto, use la librería `caret` de la siguiente forma:
+
+```{r}
+library(caret)
+#set.seed(123)
+#trainIndex <- createDataPartition(bank_full_balanced$y, p = 0.8, 
+                                  #list = FALSE, 
+                                  #times = 1)
+
+#trainData <- bank_full_balanced[ trainIndex,] # datos de entrenamiento
+#testData  <- bank_full_balanced[-trainIndex,] # datos de prueba
+```
+
+
+
+```{r}
+set.seed(123)
+inTrain <- createDataPartition(bank_full$y, p = 0.2, list = FALSE)
+intrainData <- bank_full[inTrain, ]
+testData <- bank_full[-inTrain, ]
+```
+
+
+```{r}
+nrow(bank_full)
+
+ntrain <- nrow(bank_full)*0.8
+ntest <- nrow(bank_full)*0.2
+c(ntrain,ntest)
+
+set.seed(123)
+index_train<-sample(1:nrow(bank_full),size = ntrain)
+train<-bank_full[index_train,]
+test<-bank_full[-index_train,]
+
+summary(train)
+```
+
+```{r}
+#smote_dataset <- data.frame(
+#job = factor(c("bluecollar", "management","technician", "admin","services", "retired"),levels=levels(smote_dataset$job)),
+#default = factor(c("NO","YES"), levels=levels(smote_dataset$default)),
+#housing  = factor(c("NO","YES"), levels=levels(smote_dataset$housing )),
+#loan = factor(c("NO","YES"), levels=levels(smote_dataset$loan)),
+#marital = factor(c("divorced", "married","management"),levels=levels(smote_dataset$marital)),
+#education = factor(c("primary", "secondary","tertiary","unknown"),levels=levels(smote_dataset$education)),
+#poutcome =  factor(c("failure", " other","success","unknown"),levels=levels(smote_dataset$poutcome)),
+#age = c(18, 95)
+#)
+
+#predictions <- predict(modelo_logistico,smote_dataset, type = "response") 
+
+#ifelse(predictions > 0.8, "Aceptación del producto","No Aceptación del producto")
+
+random_smote_dataset <- smote_dataset %>% sample_n(50)
+
+```
+
+
+```{r}
+predicted_value <- predict(modelo_logistico,test,type = "response")
+predicted_class <- ifelse(predicted_value>0.8, "No","Yes")
+performance_data<-data.frame(observed=smote_dataset$y,
+           prediccion = "Aceptación del producto","Frecuencia Relativa")
+```
+
+-**Al evaluar la capacidad predictiva del modelo desarrollado, utilizamos una matriz de confusión. Esta herramienta nos permite analizar cómo el modelo clasifica las observaciones en función de sus predicciones y los resultados reales. La división de los datos en un conjunto de entrenamiento (80%) y un conjunto de prueba (20%) es una práctica común para evaluar el rendimiento del modelo de una manera imparcial y de esta manera podamos verificar su generalización a nuevos datos**.
+
+
+- Finalmente, emplee la matriz de confusión para evaluar la precisión, sensibilidad y especificidad del modelo, lo que permitirá obtener una visión más clara de su desempeño general. Válgase de los siguientes códigos:
+
+
+```{r eval=FALSE}
+library(caret)
+confusionMatrix(data=y_predictions_en_datosprueba,
+                reference = y_reales_en_datosprueba,
+                positive="yes") # aquí se indica que valor es el positivo
+```
+
+**Sensibilidad, exhaustividad, Tasa de verdaderos positivos**
+-Cuando la clase es positiva
+
+-***Sensibilidad=VPT/Total Positivos***
+
+
+**Especificidad, tasa de verdaderos negativos**
+-Cuando la clase es negativa
+
+-***Especificidad=VN/TotalNegativos***
+
+**Precisión**
+Cuando predice positvos
+
+-***Precisión=VPTotal clasificados positivos***
+
+**Valor de predicción negativo**
+Cuando predice negativo
+
+***VPN=VN/ Total clasificados negativos***
+
+```{r}
+positive <- sum(smote_dataset$y_predicted_en_datosprueba=="Yes")
+negative <- sum(smote_dataset$y_predicted_en_datosprueba=="No")
+predicted_positive <- sum(smote_dataset$y_reales_en_datosprueba=="Yes")
+predicted_negative <- sum(smote_dataset$y_reales_en_datosprueba=="No")
+tabla <- nrow(smote_dataset)
+data.frame(positive= "4239",negative = "31929")
+```
+**Finalmente, se utiliza la matriz de confusión junto con el código proporcionado, especificando que "yes" es el valor positivo,"No" valor negativo teniendo una mayor cantidad de aceptacion, para evaluar la precisión, sensibilidad y especificidad del modelo, lo que proporciona una visión más completa y clara de su rendimiento general en la tarea de clasificación.**
